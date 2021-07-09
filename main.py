@@ -106,7 +106,7 @@ pb4=0
 pb5=0
 
 def fast_init():
-    ser = serial.Serial(serial_port, 300, timeout=0.1) #CP210x is configured for 300 being 360
+    ser = serial.Serial(serial_port, 300, timeout=0.1)  #CP210x is configured for 300 being 360
     command=b"\x00"
     ser.write(command) #Send a 25ms pulse
     time.sleep(0.05)
@@ -132,10 +132,10 @@ def send_packet(data,res_size):
 
     read_val_s = read_val[0:ignore]
     if debug > 2:    
-        print "Data Sent: %s." % ":".join("{:02x}".format(ord(c)) for c in read_val_s)
+        print("Data Sent: %s." % ":".join("{:02x}".format(ord(c)) for c in read_val_s))
     read_val_r = read_val[ignore:]
     if debug > 2: 
-        print "Data Received: %s." % ":".join("{:02x}".format(ord(c)) for c in read_val_r)
+        print("Data Received: %s." % ":".join("{:02x}".format(ord(c)) for c in read_val_r))
     
     modulo=0
     for i in range(0,len(read_val_r)-1):
@@ -146,7 +146,7 @@ def send_packet(data,res_size):
         if (modulo!=ord(read_val_r[len(read_val_r)-1])): #Checksum error
             read_val_r=""
             if debug > 1:
-                print "Checksum ERROR"
+                print("Checksum ERROR")
        
     return read_val_r
 
@@ -183,11 +183,11 @@ def seed_key(read_val_r):
     
     seed = read_val_r[3:5]
     if debug > 1:
-        print "\tSeed is: %s." % ":".join("{:02x}".format(ord(c)) for c in seed)
+        print("\tSeed is: %s." % ":".join("{:02x}".format(ord(c)) for c in seed))
     
     seed_int=ord(seed[0])*256+ord(seed[1])
     if debug > 1:
-        print "\tSeed integer: %s." % seed_int
+        print("\tSeed integer: %s." % seed_int)
     
     seed=seed_int
 
@@ -213,7 +213,7 @@ def seed_key(read_val_r):
 
     key=chr(high)+chr(low)
     if debug > 1:
-        print "\tKey hex: %s." % ":".join("{:02x}".format(ord(c)) for c in key)
+        print("\tKey hex: %s." % ":".join("{:02x}".format(ord(c)) for c in key))
         
     key_answer=b"\x04\x27\x02"+key
     
@@ -365,11 +365,13 @@ def get_power_balance():
     
     
 os.system("cls")
-print ""
-print ""
-print "\t\t Land Rover Td5 Storm - Dignostic tool"
-print ""
-print "Initing..."
+
+print("""
+      \t\t Land Rover Td5 Storm - Dignostic tool
+      
+      Initializing..."
+      
+      """)
 
 fast_init()
 
@@ -396,25 +398,25 @@ while (True):
 
     
     os.system("cls")
-    print "\t\t Td5 Storm"
-    print " "
-    print "\t Bateria Tentsioa: ", str(b_voltage), " Volt"
-    print "\t RPM: ", str(rpm)
-    print "\t RPM Error: ", str(rpm_error)
-    print "\t Abiadura: ", str(speed), " KMH"
-    print "\t Uraren tenperatura: ", str(t_coolant), " C"
-    print "\t Airearen tenperatura: ", str(t_air), " C"
-    print "\t Kanpoko tenperatura: ", str(t_ext), " C"
-    print "\t Gasoilaren tenperatura: ", str(t_fuel), " C"
-    print "\t Azeleragailuen pistak (Volt): ", str(p1), " ", str(p2), " ", str(p3), " ", str(p4), " ", str(supply)
-    print "\t Kolektoreko presioa: ", str(aap), " Bar"
-    print "\t Aire Masa neurgailua: ", str(maf)
-    print "\t Kanpoko presioa:", str(ap1), " Bar"
-    print "\t Turboaren presioa (kalkulatua):", str(aap-ap1), " Bar"
-    print "\t Zilindroak: ", str(pb1), " ", str(pb2), " ", str(pb3), " ", str(pb4), " ", str(pb5)
-    print "\t EGR Modulation: N/A"
-    print "\t EGR Inlet: N/A"
-    print "\t Wastegate MOdulation: N/A"
+    print(f"""
+    \t\t Td5 Storm"
+    Bateria Tentsioa: {str(b_voltage)} Volt"
+    RPM: {str(rpm)}
+    RPM Error: {str(rpm_error)}
+    Abiadura: {str(speed)} KMH"
+    Uraren tenperatura: {str(t_coolant)} C"
+    Airearen tenperatura: {str(t_air)} C"
+    Kanpoko tenperatura: {str(t_ext)} C"
+    Gasoilaren tenperatura: {str(t_fuel)} C"
+    Azeleragailuen pistak (Volt):{str(p1)} {str(p2)} {str(p3)} {str(p4)} {str(supply)}
+    Kolektoreko presioa: {str(aap)} Bar"
+    Aire Masa neurgailua: {str(maf)}
+    Kanpoko presioa: {str(ap1)} Bar"
+    Turboaren presioa (kalkulatua): {str(aap - ap1)} Bar"
+    Zilindroak: {str(pb1)} {str(pb2)} {str(pb3)} {str(pb4)} {str(pb5)}
+    EGR Modulation: N/A"
+    EGR Inlet: N/A"
+    Wastegate MOdulation: N/A""")
     
         # response=send_packet(b"\x02\x21\x1e",6)
         # print "\n\n\tHex is: %s." % ":".join("{:02x}".format(ord(c)) for c in response)
