@@ -115,14 +115,12 @@ def fast_init():
 def send_packet(data,res_size):
     global debug
     time.sleep(interframe_delay)
-    
+
     lendata=len(data)
-    
-    modulo=0
-    for i in range(0,lendata):
-        modulo = modulo + ord(data[i]) 
-    modulo = modulo % 256
-    
+
+    modulo = sum(ord(data[i]) for i in range(lendata))
+    modulo %= 256
+
     to_send=data+chr(modulo)
     ser.write(to_send)
     time.sleep(interframe_delay)
@@ -136,18 +134,19 @@ def send_packet(data,res_size):
     read_val_r = read_val[ignore:]
     if debug > 2: 
         print("Data Received: %s." % ":".join("{:02x}".format(ord(c)) for c in read_val_r))
-    
+
     modulo=0
-    for i in range(0,len(read_val_r)-1):
-        modulo = modulo + ord(read_val_r[i]) 
-    modulo = modulo % 256
-    
-    if (len(read_val_r)>2):
-        if (modulo!=ord(read_val_r[len(read_val_r)-1])): #Checksum error
-            read_val_r=""
-            if debug > 1:
-                print("Checksum ERROR")
-       
+    for i in range(len(read_val_r)-1):
+        modulo += ord(read_val_r[i])
+    modulo %= 256
+
+    if (len(read_val_r) > 2) and (
+        modulo != ord(read_val_r[len(read_val_r) - 1])
+    ): #Checksum error
+        read_val_r=""
+        if debug > 1:
+            print("Checksum ERROR")
+
     return read_val_r
 
 def seed_key(read_val_r):
@@ -180,29 +179,26 @@ def seed_key(read_val_r):
 
     # key_answer=b"\x04\x27\x02"+key
     # return key_answer
-    
+
     seed = read_val_r[3:5]
     if debug > 1:
         print("\tSeed is: %s." % ":".join("{:02x}".format(ord(c)) for c in seed))
-    
+
     seed_int=ord(seed[0])*256+ord(seed[1])
     if debug > 1:
         print("\tSeed integer: %s." % seed_int)
-    
+
     seed=seed_int
 
     count = ((seed >> 0xC & 0x8) + (seed >> 0x5 & 0x4) + (seed >> 0x3 & 0x2) + (seed & 0x1)) + 1
 
-    idx = 0
-    while (idx < count):
-            tap = ((seed >> 1) ^ (seed >> 2 ) ^ (seed >> 8 ) ^ (seed >> 9)) & 1
-            tmp = (seed >> 1) | ( tap << 0xF)
-            if (seed >> 0x3 & 1) and (seed >> 0xD & 1):
-                    seed = tmp & ~1
-            else:
-                    seed = tmp | 1
-
-            idx = idx + 1
+    for _ in range(count):
+        tap = ((seed >> 1) ^ (seed >> 2 ) ^ (seed >> 8 ) ^ (seed >> 9)) & 1
+        tmp = (seed >> 1) | ( tap << 0xF)
+        if (seed >> 0x3 & 1) and (seed >> 0xD & 1):
+                seed = tmp & ~1
+        else:
+                seed = tmp | 1
 
     if (seed<256):
         high=0x00
@@ -214,10 +210,8 @@ def seed_key(read_val_r):
     key=chr(high)+chr(low)
     if debug > 1:
         print("\tKey hex: %s." % ":".join("{:02x}".format(ord(c)) for c in key))
-        
-    key_answer=b"\x04\x27\x02"+key
-    
-    return key_answer
+
+    return b"\x04\x27\x02"+key
 
 def get_rpm():
     global rpm
@@ -394,36 +388,15 @@ response=send_packet(b"\x02\x21\x02",15)             #Start Diagnostics
 time.sleep(2)
 
 #Start requesting data
-while (True):
+while True:
 
     
     os.system("cls")
-    print(f"""
-    \t\t Td5 Storm"
-    Bateria Tentsioa: {str(b_voltage)} Volt"
-    RPM: {str(rpm)}
-    RPM Error: {str(rpm_error)}
-    Abiadura: {str(speed)} KMH"
-    Uraren tenperatura: {str(t_coolant)} C"
-    Airearen tenperatura: {str(t_air)} C"
-    Kanpoko tenperatura: {str(t_ext)} C"
-    Gasoilaren tenperatura: {str(t_fuel)} C"
-    Azeleragailuen pistak (Volt):{str(p1)} {str(p2)} {str(p3)} {str(p4)} {str(supply)}
-    Kolektoreko presioa: {str(aap)} Bar"
-    Aire Masa neurgailua: {str(maf)}
-    Kanpoko presioa: {str(ap1)} Bar"
-    Turboaren presioa (kalkulatua): {str(aap - ap1)} Bar"
-    Zilindroak: {str(pb1)} {str(pb2)} {str(pb3)} {str(pb4)} {str(pb5)}
-    EGR Modulation: N/A"
-    EGR Inlet: N/A"
-    Wastegate MOdulation: N/A""")
-    
-        # response=send_packet(b"\x02\x21\x1e",6)
-        # print "\n\n\tHex is: %s." % ":".join("{:02x}".format(ord(c)) for c in response)
-        
-        # response=send_packet(b"\x02\x21\x36",6)
-        # print "\tHex is: %s." % ":".join("{:02x}".format(ord(c)) for c in response)
-        
+    print(
+        f'\x1f    \t\t Td5 Storm"\x1f    Bateria Tentsioa: {b_voltage} Volt"\x1f    RPM: {rpm}\x1f    RPM Error: {rpm_error}\x1f    Abiadura: {speed} KMH"\x1f    Uraren tenperatura: {t_coolant} C"\x1f    Airearen tenperatura: {t_air} C"\x1f    Kanpoko tenperatura: {t_ext} C"\x1f    Gasoilaren tenperatura: {t_fuel} C"\x1f    Azeleragailuen pistak (Volt):{p1} {p2} {p3} {p4} {supply}\x1f    Kolektoreko presioa: {aap} Bar"\x1f    Aire Masa neurgailua: {maf}\x1f    Kanpoko presioa: {ap1} Bar"\x1f    Turboaren presioa (kalkulatua): {aap - ap1} Bar"\x1f    Zilindroak: {pb1} {pb2} {pb3} {pb4} {pb5}\x1f    EGR Modulation: N/A"\x1f    EGR Inlet: N/A"\x1f    Wastegate MOdulation: N/A'
+    )
+
+
     b_voltage=get_bvolt()
     rpm=get_rpm()
     rpm_error=get_rpm_error()

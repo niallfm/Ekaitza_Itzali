@@ -191,24 +191,20 @@ initialize()
 
 print ("\n\tLand Rover Td5 Map Reader\n")
 
-f=open('outputfile.bin', 'wb')
+with open('outputfile.bin', 'wb') as f:
+    byte1=0
+    byte2=9
+    byte3=64
+    while (1):
+        address=chr(byte1)+chr(byte2)+chr(byte3)
+        sys.stdout.write("\r\tReading Address: 0x%s" % "".join("{:02x}".format(ord(c)) for c in address))
+        sys.stdout.flush()
 
-byte1=0
-byte2=9
-byte3=64
-while (1):
-    address=chr(byte1)+chr(byte2)+chr(byte3)
-    sys.stdout.write("\r\tReading Address: 0x%s" % "".join("{:02x}".format(ord(c)) for c in address))
-    sys.stdout.flush()
-    
-    response=send_packet(b"\x05\x23"+address+"\x40",68)
-    # f.write(response[3:67])
-    # byte3=byte3+0x40
-    # if byte3==256:
-        # byte2=byte2+1
-        # byte3=0
-        # if byte2==16:
-            # byte2=0
-
-
-f.close()
+        response=send_packet(b"\x05\x23"+address+"\x40",68)
+        # f.write(response[3:67])
+        # byte3=byte3+0x40
+        # if byte3==256:
+            # byte2=byte2+1
+            # byte3=0
+            # if byte2==16:
+                # byte2=0

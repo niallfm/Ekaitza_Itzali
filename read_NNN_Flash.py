@@ -96,12 +96,10 @@ def fast_init():
 def send_packet(data,res_size):
     global debug
     time.sleep(interframe_delay)
-    
+
     lendata=len(data)
-    modulo=0
-    for i in range(0,lendata):
-        modulo = modulo + data[i]
-    modulo = modulo % 256
+    modulo = sum(data[i] for i in range(lendata))
+    modulo %= 256
     to_send=data+chr(modulo).encode('latin1')
     ser.write(to_send)
     time.sleep(interframe_delay)
@@ -115,18 +113,15 @@ def send_packet(data,res_size):
     read_val_r = read_val[ignore:]
     if debug > 2: 
         print ("Data Received: %s." % binascii.b2a_hex(read_val_r))
-    
-    modulo=0
-    for i in range(0,len(read_val_r)-1):
-        modulo = modulo + read_val_r[i] 
-    modulo = modulo % 256
-    
-    if (len(read_val_r)>2):
-        if (modulo!=read_val_r[len(read_val_r)-1]): #Checksum error
-            read_val_r=""
-            if debug > 1:
-                print ("Checksum ERROR")
-       
+
+    modulo = sum(read_val_r[i] for i in range(len(read_val_r)-1))
+    modulo %= 256
+
+    if (len(read_val_r) > 2) and (modulo != read_val_r[len(read_val_r) - 1]): #Checksum error
+        read_val_r=""
+        if debug > 1:
+            print ("Checksum ERROR")
+
     return read_val_r
 
 def seed_key(read_val_r):
@@ -136,21 +131,18 @@ def seed_key(read_val_r):
     seed_int=seed[0]*256+seed[1]
     if debug > 1:
         print ("\tSeed integer: %s." % seed_int)
-    
+
     seed=seed_int
 
     count = ((seed >> 0xC & 0x8) + (seed >> 0x5 & 0x4) + (seed >> 0x3 & 0x2) + (seed & 0x1)) + 1
 
-    idx = 0
-    while (idx < count):
-            tap = ((seed >> 1) ^ (seed >> 2 ) ^ (seed >> 8 ) ^ (seed >> 9)) & 1
-            tmp = (seed >> 1) | ( tap << 0xF)
-            if (seed >> 0x3 & 1) and (seed >> 0xD & 1):
-                    seed = tmp & ~1
-            else:
-                    seed = tmp | 1
-
-            idx = idx + 1
+    for _ in range(count):
+        tap = ((seed >> 1) ^ (seed >> 2 ) ^ (seed >> 8 ) ^ (seed >> 9)) & 1
+        tmp = (seed >> 1) | ( tap << 0xF)
+        if (seed >> 0x3 & 1) and (seed >> 0xD & 1):
+                seed = tmp & ~1
+        else:
+                seed = tmp | 1
 
     if (seed<256):
         high=0x00
@@ -162,10 +154,12 @@ def seed_key(read_val_r):
     key=chr(int(high)).encode('latin1')+chr(int(low)).encode('latin1')
     if debug > 1:
         print ("\tKey hex: %s." % binascii.b2a_hex(key))
-        
-    key_answer=b"\x04\x27\x02"+chr(int(high)).encode('latin1')+chr(int(low)).encode('latin1')
-    
-    return key_answer
+
+    return (
+        b"\x04\x27\x02"
+        + chr(int(high)).encode('latin1')
+        + chr(int(low)).encode('latin1')
+    )
     
 def initialize():
     global ser
@@ -190,41 +184,38 @@ initialize()
 
 print ("\n\tLand Rover Td5 Map Reader\n")
 
-f=open('outputfile.bin', 'wb')
+with open('outputfile.bin', 'wb') as f:
+    byte1=0x11
+    byte2=0x00
+    byte3=0x00
+    while 1:
 
-byte1=0x11
-byte2=0x00
-byte3=0x00
-while (1):
+        percent=((byte1-0x11)*256*256+byte2*256+byte3)/(3*256*256)
+        address=bytes([byte1])+bytes([byte2])+bytes([byte3])
+        print("\tReading Address: %s - %s Complete" % (binascii.b2a_hex(address),'{:.1%}'.format(percent)), end="\r")
 
-    percent=((byte1-0x11)*256*256+byte2*256+byte3)/(3*256*256)
-    address=bytes([byte1])+bytes([byte2])+bytes([byte3])
-    print("\tReading Address: %s - %s Complete" % (binascii.b2a_hex(address),'{:.1%}'.format(percent)), end="\r")
-
-    if (byte1==0x13 and byte2==0xff):
-        response=send_packet(b"\x05\x23"+bytes([byte1])+bytes([byte2])+bytes([byte3])+b"\x10",20)
-        while (len(response)<19):
+        if (byte1==0x13 and byte2==0xff):
             response=send_packet(b"\x05\x23"+bytes([byte1])+bytes([byte2])+bytes([byte3])+b"\x10",20)
-        f.write(response[3:19])
-    else:
-        response=send_packet(b"\x05\x23"+bytes([byte1])+bytes([byte2])+bytes([byte3])+b"\x40",68)
-        while (len(response)<67):
+            while (len(response)<19):
+                response=send_packet(b"\x05\x23"+bytes([byte1])+bytes([byte2])+bytes([byte3])+b"\x10",20)
+            f.write(response[3:19])
+        else:
             response=send_packet(b"\x05\x23"+bytes([byte1])+bytes([byte2])+bytes([byte3])+b"\x40",68)
-        f.write(response[3:67])
-    
-    if (byte1==0x13 and byte2==0xff and byte3==0xe0):
-        break
+            while (len(response)<67):
+                response=send_packet(b"\x05\x23"+bytes([byte1])+bytes([byte2])+bytes([byte3])+b"\x40",68)
+            f.write(response[3:67])
 
-    if (byte1==0x13 and byte2==0xff):
-        byte3=byte3+0x10
-    else:
-        byte3=byte3+0x40
-        
-    if byte3==256:
-        byte2=byte2+1
-        byte3=0
-        if byte2==256:
-            byte1=byte1+1
-            byte2=0
+        if (byte1==0x13 and byte2==0xff and byte3==0xe0):
+            break
 
-f.close()
+        if (byte1==0x13 and byte2==0xff):
+            byte3 += 0x10
+        else:
+            byte3 += 0x40
+
+        if byte3==256:
+            byte2 += 1
+            byte3=0
+            if byte2==256:
+                byte1 += 1
+                byte2=0

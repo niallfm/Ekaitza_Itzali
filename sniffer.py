@@ -84,7 +84,7 @@ ser = serial.Serial(serial_port, 10400, timeout=0.001)    #CP210x must be config
 line_br=0
 
 
-while (True):
+while True:
     read_val = ser.read(1);
     if (read_val):
         sys.stdout.write("{:02x}".format(ord(read_val)))
@@ -92,9 +92,8 @@ while (True):
         #sys.stdout.write("{:08b}".format(ord(read_val)))
         sys.stdout.flush()
         line_br=0
-    else:
-        if line_br==0:
-            sys.stdout.write("\n")
-            sys.stdout.flush()
-            line_br=1
+    elif line_br==0:
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+        line_br=1
     

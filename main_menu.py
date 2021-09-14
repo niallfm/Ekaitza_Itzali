@@ -405,12 +405,10 @@ def fast_init():
 def send_packet(data,res_size):
     global debug
     time.sleep(interframe_delay)
-    
+
     lendata=len(data)
-    modulo=0
-    for i in range(0,lendata):
-        modulo = modulo + data[i]
-    modulo = modulo % 256
+    modulo = sum(data[i] for i in range(lendata))
+    modulo %= 256
     to_send=data+chr(modulo).encode('latin1')
     ser.write(to_send)
     time.sleep(interframe_delay)
@@ -424,18 +422,15 @@ def send_packet(data,res_size):
     read_val_r = read_val[ignore:]
     if debug > 2: 
         print(("Data Received: %s." % binascii.b2a_hex(read_val_r)))
-    
-    modulo=0
-    for i in range(0,len(read_val_r)-1):
-        modulo = modulo + read_val_r[i] 
-    modulo = modulo % 256
-    
-    if (len(read_val_r)>2):
-        if (modulo!=read_val_r[len(read_val_r)-1]): #Checksum error
-            read_val_r=""
-            if debug > 1:
-                print ("Checksum ERROR")
-       
+
+    modulo = sum(read_val_r[i] for i in range(len(read_val_r)-1))
+    modulo %= 256
+
+    if (len(read_val_r) > 2) and (modulo != read_val_r[len(read_val_r) - 1]): #Checksum error
+        read_val_r=""
+        if debug > 1:
+            print ("Checksum ERROR")
+
     return read_val_r
 
 def seed_key(read_val_r):
@@ -445,21 +440,18 @@ def seed_key(read_val_r):
     seed_int=seed[0]*256+seed[1]
     if debug > 1:
         print(("\tSeed integer: %s." % seed_int))
-    
+
     seed=seed_int
 
     count = ((seed >> 0xC & 0x8) + (seed >> 0x5 & 0x4) + (seed >> 0x3 & 0x2) + (seed & 0x1)) + 1
 
-    idx = 0
-    while (idx < count):
-            tap = ((seed >> 1) ^ (seed >> 2 ) ^ (seed >> 8 ) ^ (seed >> 9)) & 1
-            tmp = (seed >> 1) | ( tap << 0xF)
-            if (seed >> 0x3 & 1) and (seed >> 0xD & 1):
-                    seed = tmp & ~1
-            else:
-                    seed = tmp | 1
-
-            idx = idx + 1
+    for _ in range(count):
+        tap = ((seed >> 1) ^ (seed >> 2 ) ^ (seed >> 8 ) ^ (seed >> 9)) & 1
+        tmp = (seed >> 1) | ( tap << 0xF)
+        if (seed >> 0x3 & 1) and (seed >> 0xD & 1):
+                seed = tmp & ~1
+        else:
+                seed = tmp | 1
 
     if (seed<256):
         high=0x00
@@ -471,15 +463,17 @@ def seed_key(read_val_r):
     key=chr(int(high)).encode('latin1')+chr(int(low)).encode('latin1')
     if debug > 1:
         print(("\tKey hex: %s." % binascii.b2a_hex(key)))
-        
-    key_answer=b"\x04\x27\x02"+chr(int(high)).encode('latin1')+chr(int(low)).encode('latin1')
-    
-    return key_answer
+
+    return (
+        b"\x04\x27\x02"
+        + chr(int(high)).encode('latin1')
+        + chr(int(low)).encode('latin1')
+    )
 
 def bcdtoint(char):
     answer=0
-    answer = answer + int(char/16)*10
-    answer = answer + (char%16)
+    answer += int(char/16)*10
+    answer += char%16
     return answer
     
 def initialize():
@@ -627,11 +621,11 @@ def get_faults():
     global fault_list
     fault_list=[]
     response=send_packet(b"\x02\x21\x3b",39)
-    for i in range(0,36):
-        for j in range(0,8):
+    for i in range(36):
+        for j in range(8):
             if ord(response[i+3]) & int(pow(2,int(j))) != 0:
                 fault_list.append(int(i)*8+int(j))
-                
+
     return fault_list
         
     
@@ -734,42 +728,15 @@ def get_inputs():
     response=send_packet(b"\x02\x21\x1e",6)
     byte1=response[3]
     byte2=response[4]
-    if byte2 & 0b01000000 != 0:
-        xfer=1
-    else:
-        xfer=0
-    if byte1 & 0b1 != 0:
-        br2=1
-    else:
-        br2=0
-    if byte2 & 0b10000000 != 0:
-        br1=1
-    else:
-        br1=0
-    if byte1 & 0b00000010 != 0:
-        clutch=1
-    else:
-        clutch=0
-    if byte1 & 0b00000100 != 0:
-        ccm=1
-    else:
-        ccm=0
-    if byte1 & 0b00010000 != 0:
-        ccr=1
-    else:
-        ccr=0
-    if byte1 & 0b00001000 != 0:
-        ccsa=1
-    else:
-        ccsa=0
-    if byte2 & 0b00001000 != 0:
-        accr=1
-    else:
-        accr=0
-    if byte2 & 0b00000100 != 0:
-        acfr=1 
-    else:
-        acfr=0
+    xfer = 1 if byte2 & 0b01000000 != 0 else 0
+    br2 = 1 if byte1 & 0b1 != 0 else 0
+    br1 = 1 if byte2 & 0b10000000 != 0 else 0
+    clutch = 1 if byte1 & 0b00000010 != 0 else 0
+    ccm = 1 if byte1 & 0b00000100 != 0 else 0
+    ccr = 1 if byte1 & 0b00010000 != 0 else 0
+    ccsa = 1 if byte1 & 0b00001000 != 0 else 0
+    accr = 1 if byte2 & 0b00001000 != 0 else 0
+    acfr = 1 if byte2 & 0b00000100 != 0 else 0
     return br1,br2,clutch,xfer,ccm,ccr,ccsa,accr,acfr
 
 menu_code=0;
@@ -778,7 +745,7 @@ current_mode=0;
 
 ser=0
 
-while (True):
+while True:
     time.sleep(0.01)
     os.system("cls")
     print("-------------------------------------------------------------------------------")
@@ -786,11 +753,11 @@ while (True):
     print("-------------------------------------------------------------------------------")
     print("|                                                                             |", end="\r")
     print("| COM Port: %s - Map: %s - Fuel: %s - Homol: %s"% (serial_port,map_variant,fuel_variant,homologation))
-    print("|                                                                             |", end="\r")    
+    print("|                                                                             |", end="\r")
     print("| VIN: %s - ECU Model: %s"% (VIN,ecu_type))
     print("-------------------------------------------------------------------------------")
     print("| 1. Fuelling - 2. Inputs - 3. Outputs - 4. Settings - 5. Faults - 6. Map     |")
-    print("-------------------------------------------------------------------------------")                                       
+    print("-------------------------------------------------------------------------------")
     if (menu_code==0):
         print("\n Land Rover Td5 Motorren Azterketa Programa")
         print("\t\t Ongi Etorri")
@@ -819,26 +786,26 @@ while (True):
             print("\n Ez da serie porturik topatu sisteman :(")
             print(" Programa amaitzen")
             #exit()
-        
+
         initialize()
         time.sleep(0.1)
         response=send_packet(b"\x02\x3e\x01",3)             #Start outputs
         current_mode=4
         time.sleep(0.5)
-        
+
         get_setting()
-        
+
         response=send_packet(b"\x01\x20",3)             
         response=send_packet(b"\x01\x82",3)
         ser.close()  
         current_mode=0
         time.sleep(logout_sleep)
-        
+
         time.sleep(0.5)
-        
+
         menu_code=1
         continue
-        
+
     if (menu_code==1):
         print("| Fuelling Parameters                                                         |")
         print("|-----------------------------------------------------------------------------|")
@@ -880,13 +847,13 @@ while (True):
             print("\t A/F ratio (Calculado): ",afratio)
         except:
             print("\t A/F ratio (Calculado): inf")
-        
+
         # response=send_packet(b"\x02\x21\x1e",6)
         # print "\n\n\tHex is: %s." % ":".join("{:02x}".format(ord(c)) for c in response)
-        
+
         # response=send_packet(b"\x02\x21\x36",6)
         # print "\tHex is: %s." % ":".join("{:02x}".format(ord(c)) for c in response)
-        
+
         if (current_mode!=1):
             if debug > 2:  
                 print ("Logging in")
@@ -894,11 +861,11 @@ while (True):
             time.sleep(0.1)
             response=send_packet(b"\x02\x21\x20",15)             #Start Diagnostics
             current_mode=1
-            
-        
+
+
         b_voltage=get_bvolt()
         rpm=get_rpm()
-        
+
         rpm_error=get_rpm_error()
         speed=get_speed()
         t_coolant, t_air, t_ext, t_fuel =get_temps()
@@ -907,7 +874,7 @@ while (True):
         ap1, ap2 = get_pressures()
         pb1,pb2,pb3,pb4,pb5=get_power_balance()
         fu1,fu2,fu3,fu4,fu5,fu6,fu7,fu8=get_fu()
-        
+
         if msvcrt.kbhit():
             menu_code = int(msvcrt.getch())
             time.sleep(0.1)
@@ -922,11 +889,11 @@ while (True):
                 time.sleep(logout_sleep)
                 os.system("cls")
                 continue
-    
+
     if (menu_code==2):
         print("| Inputs                                                                      |")
         print("|-----------------------------------------------------------------------------|")
-        
+
         print("\t Brake 1, Brake 2: ", str(br1), " ", str(br2))
         print("\t Clutch: ", str(clutch))
         print("\t Transfer: ", str(xfer))
@@ -934,18 +901,18 @@ while (True):
         print("\t Cruise Control Main, Resume, Set/Accelerate: ", str(ccm), " ", str(ccr), " ", str(ccsa))
         print("\t A/C Clutch Req: ", str(accr))
         print("\t A/C Fan Req:  ", str(acfr))
-        
-        
+
+
         if (current_mode!=2):
             initialize()
             time.sleep(0.1)
             response=send_packet(b"\x02\x3e\x01",3)             #Start Inputs
             current_mode=2
-         
+
         br1,br2,clutch,xfer,ccm,ccr,ccsa,accr,acfr=get_inputs()
         time.sleep(0.1) 
 
-        
+
         if msvcrt.kbhit():
             menu_code = int(msvcrt.getch())
             time.sleep(0.1)
@@ -960,7 +927,7 @@ while (True):
                 time.sleep(logout_sleep)
                 os.system("cls")
                 continue
-        
+
     if (menu_code==3):
         print("| Outputs                                                                     |")
         print("|-----------------------------------------------------------------------------|")
@@ -979,87 +946,87 @@ while (True):
         print("\t M: Test Injector 4")
         print("\t N: Test Injector 5")
         print("\n   Enter letter for test: ")
-    
+
         if (current_mode!=3):
             initialize()
             time.sleep(0.1)
             response=send_packet(b"\x02\x3e\x01",3)             #Start outputs
             current_mode=3
-            
-        while(True):
+
+        while True:
             time.sleep(0.1)
             response=send_packet(b"\x02\x3e\x01",3)
             if msvcrt.kbhit():
-                if (msvcrt.getch()=="a" or msvcrt.getch()=="A"):
+                if msvcrt.getch() in ["a", "A"]:
                     response=send_packet(b"\x03\x30\xa3\xff",4)
                     print("\n   Testing AC Clutch")
                     time.sleep(2)
                     break
-                elif (msvcrt.getch()=="b" or msvcrt.getch()=="B"):
+                elif msvcrt.getch() in ["b", "B"]:
                     response=send_packet(b"\x03\x30\xa4\xff",4)
                     print("\n   Testing AC FAN")
                     time.sleep(2)
                     break
-                elif (msvcrt.getch()=="c" or msvcrt.getch()=="C"):
+                elif msvcrt.getch() in ["c", "C"]:
                     response=send_packet(b"\x03\x30\xa2\xff",4)
                     print("\n   Testing MIL Lamp")
                     time.sleep(2)
                     break
-                elif (msvcrt.getch()=="d" or msvcrt.getch()=="D"):
+                elif msvcrt.getch() in ["d", "D"]:
                     response=send_packet(b"\x03\x30\xa1\xff",4)
                     print("\n   Testing Fuel Pump")
                     time.sleep(2)
                     break
-                elif (msvcrt.getch()=="e" or msvcrt.getch()=="E"):
+                elif msvcrt.getch() in ["e", "E"]:
                     response=send_packet(b"\x03\x30\xb3\xff",4)
                     print("\n   Testing Glow Plugs")
                     time.sleep(2)
                     break
-                elif (msvcrt.getch()=="f" or msvcrt.getch()=="F"):
+                elif msvcrt.getch() in ["f", "F"]:
                     response=send_packet(b"\x03\x30\xb7\xff",4)
                     print("\n   Testing Pulse Rev Counter")
                     time.sleep(2)
                     break
-                elif (msvcrt.getch()=="g" or msvcrt.getch()=="G"):
+                elif msvcrt.getch() in ["g", "G"]:
                     response=send_packet(b"\x07\x30\xbe\xff\x00\x0a\x13\x88",4)
                     print("\n   Testing Turbo Wastegate Modulator")
                     time.sleep(2)
                     break
-                elif (msvcrt.getch()=="h" or msvcrt.getch()=="H"):
+                elif msvcrt.getch() in ["h", "H"]:
                     response=send_packet(b"\x03\x30\xba\xff",4)
                     print("\n   Testing Temperature Gauge")
                     time.sleep(2)
                     break
-                elif (msvcrt.getch()=="i" or msvcrt.getch()=="I"):
+                elif msvcrt.getch() in ["i", "I"]:
                     response=send_packet(b"\x07\x30\xbd\xff\x00\xfa\x13\x88",4)
                     print("\n   Testing EGR Inlet Modulator")
                     time.sleep(2)
                     break
-                elif (msvcrt.getch()=="j" or msvcrt.getch()=="J"):
+                elif msvcrt.getch() in ["j", "J"]:
                     response=send_packet(b"\x03\x31\xc2\x01",4)
                     print("\n   Testing Injector 1")
                     time.sleep(2)
                     break
-                elif (msvcrt.getch()=="k" or msvcrt.getch()=="K"):
+                elif msvcrt.getch() in ["k", "K"]:
                     response=send_packet(b"\x03\x31\xc2\x02",4)
                     print("\n   Testing Injector 2")
                     time.sleep(2)
                     break
-                elif (msvcrt.getch()=="l" or msvcrt.getch()=="L"):
+                elif msvcrt.getch() in ["l", "L"]:
                     response=send_packet(b"\x03\x31\xc2\x03",4)
                     print("\n   Testing Injector 3")
                     time.sleep(2)
                     break
-                elif (msvcrt.getch()=="m" or msvcrt.getch()=="M"):
+                elif msvcrt.getch() in ["m", "M"]:
                     response=send_packet(b"\x03\x31\xc2\x04",4)
                     print("\n   Testing Injector 4")
                     time.sleep(2)
                     break
-                elif (msvcrt.getch()=="n" or msvcrt.getch()=="N"):
+                elif msvcrt.getch() in ["n", "N"]:
                     response=send_packet(b"\x03\x31\xc2\x05",4)
                     print("\n   Testing Injector 5")
                     time.sleep(2)
-                    break                    
+                    break
                 entrada=msvcrt.getch()
                 try:
                     menu_code = int(entrada)
@@ -1077,27 +1044,27 @@ while (True):
                     time.sleep(logout_sleep)
                     os.system("cls")
                     break
-    
+
     if (menu_code==4):
         print("| Settings                                                                    |")
         print("|-----------------------------------------------------------------------------|")
-    
+
         if (current_mode!=4):
             initialize()
             time.sleep(0.1)
             response=send_packet(b"\x02\x3e\x01",3)             #Start outputs
             current_mode=4
             time.sleep(0.5)
-        
+
         get_setting()
-        
+
         print("| VIN: "+VIN)
         print("| ECU Model: "+ecu_type)
         print("| Map Variant: "+map_variant)
         print("| Fuel variant: "+fuel_variant)
         print("| Homologation: "+homologation)
-        
-        
+
+
         time.sleep(0.5)
         if (menu_code != current_mode):                     #Logout
             if(ser.isOpen()):
@@ -1110,17 +1077,17 @@ while (True):
             time.sleep(logout_sleep)
             os.system("cls")
             break
-    
+
     if (menu_code==5):
         
         if (current_mode!=4):
             initialize()
             time.sleep(0.1)
             current_mode=4
-                    
+
         print("| Faults - Refresh: 5 - Clear Faults: C                                       |")
         print("|-----------------------------------------------------------------------------|")
-        
+
         fault_list=get_faults()
         for error in fault_list:
             highb=(error/8)+1
@@ -1130,13 +1097,13 @@ while (True):
                 print("\t",error, " ",fault_code_text[error])
             except:
                 exce1=1
-        while(True):
+        while True:
             time.sleep(1)
             response=send_packet(b"\x02\x3e\x01",3)
             if msvcrt.kbhit():
                 if (msvcrt.getch()=="5"): #Refresh
                     break
-                if (msvcrt.getch()=="C" or msvcrt.getch()=="c"): #Clear Faults
+                if msvcrt.getch() in ["C", "c"]: #Clear Faults
                     response=send_packet(b"\x14\x31\xdd\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",4)
                     print("|Clearing Faults|")
                     break
@@ -1157,7 +1124,7 @@ while (True):
                     time.sleep(logout_sleep)
                     os.system("cls")
                     break
-    
+
     if (menu_code==6):
         print("| Maps                                                                        |")
         print("|-----------------------------------------------------------------------------|")
@@ -1167,54 +1134,52 @@ while (True):
         else:
             print("|   NON FLASHABLE ECU                                                         |")
         print("|-----------------------------------------------------------------------------|")
-        while (1):
+        while 1:
             if msvcrt.kbhit():
                 entrada=msvcrt.getch()
-                if (entrada.decode('latin1')=="R" or entrada.decode('latin1')=="r"): #Clear Faults
+                if entrada.decode('latin1') in ["R", "r"]: #Clear Faults
                     print("|                                                                             |", end="\r")
                     print("|     Reading Map - ", end="")
                     name = input("Write filename to save: ")
-                    f=open(name, 'wb')
-                    
-                    initialize()
-                    time.sleep(0.2)
-                    byte1=0x11
-                    byte2=0x00
-                    byte3=0x00
-                    while (1):
+                    with open(name, 'wb') as f:
+                        initialize()
+                        time.sleep(0.2)
+                        byte1=0x11
+                        byte2=0x00
+                        byte3=0x00
+                        while 1:
 
-                        percent=((byte1-0x11)*256*256+byte2*256+byte3)/(3*256*256)
-                        address=bytes([byte1])+bytes([byte2])+bytes([byte3])
-                        print("|                                                                             |", end="\r")
-                        print("|\tReading Address: %s - %s Complete" % (binascii.b2a_hex(address),'{:.1%}'.format(percent)), end="\r")
+                            percent=((byte1-0x11)*256*256+byte2*256+byte3)/(3*256*256)
+                            address=bytes([byte1])+bytes([byte2])+bytes([byte3])
+                            print("|                                                                             |", end="\r")
+                            print("|\tReading Address: %s - %s Complete" % (binascii.b2a_hex(address),'{:.1%}'.format(percent)), end="\r")
 
-                        if (byte1==0x13 and byte2==0xff):
-                            response=send_packet(b"\x05\x23"+bytes([byte1])+bytes([byte2])+bytes([byte3])+b"\x10",20)
-                            while (len(response)<19):
+                            if (byte1==0x13 and byte2==0xff):
                                 response=send_packet(b"\x05\x23"+bytes([byte1])+bytes([byte2])+bytes([byte3])+b"\x10",20)
-                            f.write(response[3:19])
-                        else:
-                            response=send_packet(b"\x05\x23"+bytes([byte1])+bytes([byte2])+bytes([byte3])+b"\x40",68)
-                            while (len(response)<67):
+                                while (len(response)<19):
+                                    response=send_packet(b"\x05\x23"+bytes([byte1])+bytes([byte2])+bytes([byte3])+b"\x10",20)
+                                f.write(response[3:19])
+                            else:
                                 response=send_packet(b"\x05\x23"+bytes([byte1])+bytes([byte2])+bytes([byte3])+b"\x40",68)
-                            f.write(response[3:67])
-                        
-                        if (byte1==0x13 and byte2==0xff and byte3==0xe0):
-                            break
+                                while (len(response)<67):
+                                    response=send_packet(b"\x05\x23"+bytes([byte1])+bytes([byte2])+bytes([byte3])+b"\x40",68)
+                                f.write(response[3:67])
 
-                        if (byte1==0x13 and byte2==0xff):
-                            byte3=byte3+0x10
-                        else:
-                            byte3=byte3+0x40
-                            
-                        if byte3==256:
-                            byte2=byte2+1
-                            byte3=0
-                            if byte2==256:
-                                byte1=byte1+1
-                                byte2=0
+                            if (byte1==0x13 and byte2==0xff and byte3==0xe0):
+                                break
 
-                    f.close()
+                            if (byte1==0x13 and byte2==0xff):
+                                byte3 += 0x10
+                            else:
+                                byte3 += 0x40
+
+                            if byte3==256:
+                                byte2 += 1
+                                byte3=0
+                                if byte2==256:
+                                    byte1 += 1
+                                    byte2=0
+
                     break
                 try:
                     menu_code = int(entrada)
