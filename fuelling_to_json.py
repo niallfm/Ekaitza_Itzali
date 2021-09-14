@@ -582,11 +582,11 @@ def get_faults():
     global fault_list
     fault_list=[]
     response=send_packet(b"\x02\x21\x3b",39)
-    for i in range(0,36):
-        for j in range(0,8):
+    for i in range(36):
+        for j in range(8):
             if ord(response[i+3]) & int(pow(2,int(j))) != 0:
                 fault_list.append(int(i)*8+int(j))
-                
+
     return fault_list
         
     
@@ -626,42 +626,15 @@ def get_inputs():
     response=send_packet(b"\x02\x21\x1e",6)
     byte1=ord(response[3])
     byte2=ord(response[4])
-    if byte2 & 0b01000000 != 0:
-        xfer=1
-    else:
-        xfer=0
-    if byte1 & 0b1 != 0:
-        br2=1
-    else:
-        br2=0
-    if byte2 & 0b10000000 != 0:
-        br1=1
-    else:
-        br1=0
-    if byte1 & 0b00000010 != 0:
-        clutch=1
-    else:
-        clutch=0
-    if byte1 & 0b00000100 != 0:
-        ccm=1
-    else:
-        ccm=0
-    if byte1 & 0b00010000 != 0:
-        ccr=1
-    else:
-        ccr=0
-    if byte1 & 0b00001000 != 0:
-        ccsa=1
-    else:
-        ccsa=0
-    if byte2 & 0b00001000 != 0:
-        accr=1
-    else:
-        accr=0
-    if byte2 & 0b00000100 != 0:
-        acfr=1 
-    else:
-        acfr=0
+    xfer = 1 if byte2 & 0b01000000 != 0 else 0
+    br2 = 1 if byte1 & 0b1 != 0 else 0
+    br1 = 1 if byte2 & 0b10000000 != 0 else 0
+    clutch = 1 if byte1 & 0b00000010 != 0 else 0
+    ccm = 1 if byte1 & 0b00000100 != 0 else 0
+    ccr = 1 if byte1 & 0b00010000 != 0 else 0
+    ccsa = 1 if byte1 & 0b00001000 != 0 else 0
+    accr = 1 if byte2 & 0b00001000 != 0 else 0
+    acfr = 1 if byte2 & 0b00000100 != 0 else 0
     return br1,br2,clutch,xfer,ccm,ccr,ccsa,accr,acfr
     
 def initialize():
